@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"os"
 	"reflect"
 	"testing"
 
@@ -60,8 +59,7 @@ func setupTestDB() (gdb *gorm.DB, db *sql.DB, mock sqlmock.Sqlmock) {
 	db, mock, err = sqlmock.New()
 
 	if err != nil {
-		log.Fatal("failed to setup test database")
-		os.Exit(2)
+		log.Fatalln("failed to setup test database")
 	}
 
 	con := mysql.New(mysql.Config{
@@ -74,8 +72,7 @@ func setupTestDB() (gdb *gorm.DB, db *sql.DB, mock sqlmock.Sqlmock) {
 	gdb, err = gorm.Open(con, &gorm.Config{})
 
 	if err != nil {
-		log.Fatal("failed to setup test database")
-		os.Exit(2)
+		log.Fatalln("failed to setup test database")
 	}
 
 	return

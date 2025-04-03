@@ -103,6 +103,10 @@ type FilterScope struct {
 
 // generates the GORM scope for filtering
 func (f FilterScope) Scope() GScope {
+	if f.Ctx == nil {
+		panic("FilterScope.Ctx is not set")
+	}
+
 	var queries []string
 	var values []any
 

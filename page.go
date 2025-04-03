@@ -47,6 +47,10 @@ func (p *PageScope) Next() int {
 
 // generates the GORM scope for pagination
 func (p *PageScope) Scope() GScope {
+	if p.Ctx == nil {
+		panic("PageScope.Ctx is not set")
+	}
+
 	p.current = p.Ctx.QueryInt(PageParam, 0)
 	pageSize := p.Ctx.QueryInt(PageSizeParam, PageSize)
 	maxPage := int(math.Ceil(float64(p.Total) / float64(pageSize)))
