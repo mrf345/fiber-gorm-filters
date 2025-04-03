@@ -12,3 +12,6 @@ test-ptr: tidy clean
 
 lint: tidy
 	golangci-lint run
+
+docs:
+	godoc -http :8080

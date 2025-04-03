@@ -21,7 +21,7 @@ type PageScope struct {
 	next     int
 }
 
-// the paginated response format
+// default paginated response format
 type PaginatedResponse[T any] struct {
 	Total   int `json:"total"`
 	Results T   `json:"results"`
