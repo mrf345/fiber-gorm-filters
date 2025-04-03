@@ -4,9 +4,6 @@ fiber-gorm-filters (fgf)
 <a href='https://github.com/mrf345/fiber-gorm-filters/actions/workflows/ci.yml'>
   <img src='https://github.com/mrf345/fiber-gorm-filters/actions/workflows/ci.yml/badge.svg' alt='build status'>
 </a>
-<a href='https://github.com/golangci/golangci-lint/tree/master'>
-  <img src='https://img.shields.io/badge/linter-golangci--lint-blue.svg?logo=go&logoColor=white' alt='linter badge'>
-</a>
 <a href="https://pkg.go.dev/github.com/mrf345/fiber-gorm-filters">
   <img src='https://img.shields.io/badge/reference-blue.svg?logo=go&logoColor=white' alt='Go Reference'>
 </a>
