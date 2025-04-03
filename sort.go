@@ -47,8 +47,6 @@ func (s SortScope) Scope() GScope {
 				continue
 			}
 
-			// log.Fatalln(fields)
-
 			query = query.Order(clause.OrderByColumn{
 				Desc:   desc,
 				Column: clause.Column{Name: field},
