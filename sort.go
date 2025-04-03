@@ -21,6 +21,10 @@ type SortScope struct {
 
 // generates the GORM scope for sorting
 func (s SortScope) Scope() GScope {
+	if s.Ctx == nil {
+		panic("SortScope.Ctx is not set")
+	}
+
 	var fields = s.Default
 	var params = s.Ctx.Query(SortParam, "")
 

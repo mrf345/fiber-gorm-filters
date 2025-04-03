@@ -155,7 +155,7 @@ func main() {
     fgf.PageSizeParam = "size"
 
     app := fiber.New()
-    log.Fatal(app.Listen(":8080"))
+    log.Fatalln(app.Listen(":8080"))
 }
 ```
 
