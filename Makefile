@@ -14,4 +14,5 @@ lint: tidy
 	golangci-lint run
 
 docs:
+	sleep 2s && xdg-open http://localhost:8080 &
 	godoc -http :8080

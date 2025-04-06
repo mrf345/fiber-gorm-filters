@@ -114,7 +114,8 @@ type FilterScope struct {
 	// fiber's request context
 	Ctx *fiber.Ctx
 	// fields to allow filtering by (i.e. name, age)
-	Fields  []string
+	Fields []string
+	// map of filter special handlers keyed with <field>__<filter> (i.e. name__contains, age__gt)
 	Special SFilters
 
 	db            *gorm.DB
