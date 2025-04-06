@@ -2,16 +2,24 @@ package fgf
 
 import (
 	"fmt"
+	"log"
+	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/stoewer/go-strcase"
 	"gorm.io/gorm"
 )
 
 // fixed set of supported filters
 type Filter string
-type filterQueryMap map[Filter]func(string, string) (string, any)
+
+// map of special filter handlers, keyed by filter name (i.e. age__neq)
+type SFilters map[string]func(value any, db *gorm.DB) *gorm.DB
+
+type filterQueryMap map[Filter]func(string, any) (string, any)
 
 const (
 	// if field value contains (i.e. ?name__contains=John)
@@ -44,7 +52,7 @@ func (f Filter) Str() string {
 }
 
 // maps filter request key and value to ready to use query string and value
-func (f Filter) Map(field, value string) (q string, v any, ok bool) {
+func (f Filter) Map(field string, value any) (q string, v any, ok bool) {
 	for filter, resolve := range filterQueryMapper {
 		if filter.Str() == f.Str() {
 			q, v = resolve(field, value)
@@ -57,38 +65,46 @@ func (f Filter) Map(field, value string) (q string, v any, ok bool) {
 }
 
 var filterQueryMapper = filterQueryMap{
-	Contains: func(field, value string) (string, any) {
-		return fmt.Sprintf("%s LIKE ?", field), "%" + value + "%"
+	Contains: func(field string, value any) (string, any) {
+		return fmt.Sprintf("`%s` LIKE ?", field), fmt.Sprintf("%%%v%%", value)
 	},
-	Equals: func(field, value string) (string, any) {
-		return fmt.Sprintf("%s = ?", field), value
+	Equals: func(field string, value any) (string, any) {
+		return fmt.Sprintf("`%s` = ?", field), value
 	},
-	NotEquals: func(field, value string) (string, any) {
-		return fmt.Sprintf("%s != ?", field), value
+	NotEquals: func(field string, value any) (string, any) {
+		return fmt.Sprintf("`%s` != ?", field), value
 	},
-	Greater: func(field, value string) (string, any) {
-		return fmt.Sprintf("%s < ?", field), value
+	Greater: func(field string, value any) (string, any) {
+		return fmt.Sprintf("`%s` < ?", field), value
 	},
-	GreaterEquals: func(field, value string) (string, any) {
-		return fmt.Sprintf("%s <= ?", field), value
+	GreaterEquals: func(field string, value any) (string, any) {
+		return fmt.Sprintf("`%s` <= ?", field), value
 	},
-	Lesser: func(field, value string) (string, any) {
-		return fmt.Sprintf("%s > ?", field), value
+	Lesser: func(field string, value any) (string, any) {
+		return fmt.Sprintf("`%s` > ?", field), value
 	},
-	LesserEquals: func(field, value string) (string, any) {
-		return fmt.Sprintf("%s >= ?", field), value
+	LesserEquals: func(field string, value any) (string, any) {
+		return fmt.Sprintf("`%s` >= ?", field), value
 	},
-	StartsWith: func(field, value string) (string, any) {
-		return fmt.Sprintf("%s LIKE ?", field), value + "%"
+	StartsWith: func(field string, value any) (string, any) {
+		return fmt.Sprintf("`%s` LIKE ?", field), fmt.Sprintf("%v%%", value)
 	},
-	EndsWith: func(field, value string) (string, any) {
-		return fmt.Sprintf("%s LIKE ?", field), "%" + value
+	EndsWith: func(field string, value any) (string, any) {
+		return fmt.Sprintf("`%s` LIKE ?", field), fmt.Sprintf("%%%v", value)
 	},
-	In: func(field, value string) (string, any) {
-		return fmt.Sprintf("%s IN (?)", field), strings.Split(value, ",")
+	In: func(field string, value any) (string, any) {
+		if value, ok := value.(string); ok {
+			return fmt.Sprintf("`%s` IN (?)", field), strings.Split(value, ",")
+		}
+
+		return fmt.Sprintf("`%s` IN (?)", field), value
 	},
-	NotIn: func(field, value string) (string, any) {
-		return fmt.Sprintf("%s NOT IN (?)", field), strings.Split(value, ",")
+	NotIn: func(field string, value any) (string, any) {
+		if value, ok := value.(string); ok {
+			return fmt.Sprintf("`%s` NOT IN (?)", field), strings.Split(value, ",")
+		}
+
+		return fmt.Sprintf("`%s` NOT IN (?)", field), value
 	},
 }
 
@@ -98,31 +114,70 @@ type FilterScope struct {
 	// fiber's request context
 	Ctx *fiber.Ctx
 	// fields to allow filtering by (i.e. name, age)
-	Fields []string
+	Fields  []string
+	Special SFilters
+
+	db            *gorm.DB
+	specialValues map[string]any
 }
 
 // generates the GORM scope for filtering
-func (f FilterScope) Scope() GScope {
-	if f.Ctx == nil {
-		panic("FilterScope.Ctx is not set")
+func (f *FilterScope) Scope() GScope {
+	if len(f.Special) > 0 && f.specialValues == nil {
+		f.specialValues = make(map[string]any)
 	}
 
-	var queries []string
-	var values []any
+	return func(db *gorm.DB) *gorm.DB {
+		f.db = db
+		queries, values := f.getQueriesAndValues()
+
+		if len(queries) > 0 {
+			db = db.Where(
+				strings.Join(queries, " AND "),
+				values...,
+			)
+		}
+
+		if len(f.Special) > 0 {
+			for k, scope := range f.Special {
+				if v, ok := f.specialValues[k]; ok {
+					db = scope(v, db)
+				}
+			}
+		}
+
+		return db
+	}
+}
+
+func (f *FilterScope) getQueriesAndValues() (queries []string, values []any) {
+	var model reflect.Value
+
+	if f.db.Statement.Model != nil {
+		model = reflect.Indirect(reflect.ValueOf(f.db.Statement.Model))
+	}
 
 	for q, v := range f.Ctx.Queries() {
 		var (
 			query string
 			value any
 			ok    bool
+			err   error
 		)
 
+		if _, ok = f.Special[q]; ok {
+			f.specialValues[q] = v
+			continue
+		}
+
 		if slices.Contains(f.Fields, q) {
-			query, value, _ = Equals.Map(q, v)
+			if value, err = f.convertValue(model, q, v); err != nil {
+				continue
+			}
+
+			query, value, _ = Equals.Map(q, value)
 			queries = append(queries, query)
 			values = append(values, value)
-			continue
-		} else if !strings.Contains(q, "__") {
 			continue
 		}
 
@@ -136,7 +191,11 @@ func (f FilterScope) Scope() GScope {
 			continue
 		}
 
-		if query, value, ok = Filter(chunks[1]).Map(chunks[0], v); !ok {
+		if value, err = f.convertValue(model, chunks[0], v); err != nil {
+			continue
+		}
+
+		if query, value, ok = Filter(chunks[1]).Map(chunks[0], value); !ok {
 			continue
 		}
 
@@ -144,14 +203,30 @@ func (f FilterScope) Scope() GScope {
 		values = append(values, value)
 	}
 
-	return func(db *gorm.DB) *gorm.DB {
-		if len(queries) == 0 {
-			return db
-		}
+	return
+}
 
-		return db.Where(
-			strings.Join(queries, " AND "),
-			values...,
-		)
+func (f *FilterScope) convertValue(model reflect.Value, field, value string) (o any, err error) {
+	if !model.IsValid() {
+		return value, nil
 	}
+
+	modelField := strcase.UpperCamelCase(field)
+	kind := model.FieldByName(modelField).Kind()
+
+	switch kind {
+	case reflect.Bool:
+		o, err = strconv.ParseBool(value)
+	case reflect.Invalid:
+		log.Println("FilterScope: field not found:", modelField)
+		o = value
+	default:
+		o = value
+	}
+
+	if err != nil {
+		log.Println("FilterScope: failed to convert value:", err.Error())
+	}
+
+	return
 }

@@ -5,6 +5,7 @@ go 1.23
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/gofiber/fiber/v2 v2.47.0
+	github.com/stoewer/go-strcase v1.3.0
 	github.com/stretchr/testify v1.10.0
 	gorm.io/driver/mysql v1.5.7
 	gorm.io/gorm v1.25.12
