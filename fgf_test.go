@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -30,6 +31,7 @@ type TestModel struct {
 	Name       string
 	Age        uint
 	Occupation string
+	Active     bool
 }
 
 func GetRespParsedBody[T any](resp *http.Response) (respData T) {
@@ -94,9 +96,33 @@ func setupRoutes(app *fiber.App) {
 
 	app.Get("/test-filter", func(c *fiber.Ctx) error {
 		var items []TestModel
-		var filter = fgf.FilterScope{Ctx: c, Fields: []string{"age", "name"}}
+		var filter = fgf.FilterScope{Ctx: c, Fields: []string{"age", "name", "active"}}
 
-		if err := DB.Scopes(filter.Scope()).Find(&items).Error; err != nil {
+		if err := DB.
+			Model(&TestModel{}).
+			Scopes(filter.Scope()).
+			Find(&items).Error; err != nil {
+			log.Println(err)
+			_ = c.SendStatus(fiber.StatusInternalServerError)
+			return err
+		}
+
+		return c.JSON(items)
+	})
+
+	app.Get("/test-special-filter", func(c *fiber.Ctx) error {
+		var items []TestModel
+		var filter = fgf.FilterScope{Ctx: c, Special: fgf.SFilters{
+			"age__neq": func(value any, db *gorm.DB) *gorm.DB {
+				v, _ := strconv.ParseInt(value.(string), 10, 64)
+				return db.Where("`age` != ?", v+1)
+			},
+		}}
+
+		if err := DB.
+			Model(&TestModel{}).
+			Scopes(filter.Scope()).
+			Find(&items).Error; err != nil {
 			log.Println(err)
 			_ = c.SendStatus(fiber.StatusInternalServerError)
 			return err
