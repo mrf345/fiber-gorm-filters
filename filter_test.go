@@ -2,8 +2,10 @@ package fgf_test
 
 import (
 	"database/sql/driver"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -11,14 +13,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type AnyReqArg struct{}
+type AnyArgIn struct {
+	V []driver.Value
+}
 
-func (a AnyReqArg) Match(v driver.Value) bool {
-	if v == "%2%" || v == "22" {
-		return true
-	}
-
-	return false
+func (a AnyArgIn) Match(v driver.Value) bool {
+	log.Println("match:", v)
+	return slices.Contains(a.V, v)
 }
 
 func TestRequestFilterScope(t *testing.T) {
@@ -32,9 +33,10 @@ func TestRequestFilterScope(t *testing.T) {
 		"/test-filter?name__contains=2&age=22",
 		nil,
 	)
+	m := AnyArgIn{V: []driver.Value{"%2%", "22"}}
 
 	Mock.ExpectQuery("SELECT (.+) FROM `test_models` WHERE").
-		WithArgs(AnyReqArg{}, AnyReqArg{}).
+		WithArgs(m, m).
 		WillReturnRows(sqlmock.
 			NewRows([]string{"id", "name", "age"}).
 			AddRow(rows[0]...).
@@ -58,7 +60,56 @@ func TestRequestFilterScopeWrongFilter(t *testing.T) {
 		"/test-filter?age__gt=1&name__has=2",
 		nil,
 	)
-	Mock.ExpectQuery("SELECT .* FROM `test_models` WHERE age < (.+)").
+
+	Mock.ExpectQuery("SELECT .* FROM `test_models` WHERE `age` < (.+)").
+		WillReturnRows(sqlmock.
+			NewRows([]string{"id", "name", "age"}).
+			AddRow(rows[0]...).
+			AddRow(rows[1]...),
+		)
+
+	resp, err := App.Test(req, TestTimeoutMS)
+
+	assert.Nil(err)
+	assert.Equal(fiber.StatusOK, resp.StatusCode)
+}
+
+func TestRequestFilterScopeBoolFilter(t *testing.T) {
+	assert := assert.New(t)
+	rows := [][]driver.Value{{1, 22, true}}
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/test-filter?active=true",
+		nil,
+	)
+
+	Mock.ExpectQuery("SELECT .* FROM `test_models` WHERE `active` = (.+)").
+		WithArgs(true).
+		WillReturnRows(sqlmock.
+			NewRows([]string{"id", "age", "active"}).
+			AddRow(rows[0]...),
+		)
+
+	resp, err := App.Test(req, TestTimeoutMS)
+
+	assert.Nil(err)
+	assert.Equal(fiber.StatusOK, resp.StatusCode)
+}
+
+func TestRequestFilterScopeSpecialFilter(t *testing.T) {
+	assert := assert.New(t)
+	rows := [][]driver.Value{
+		{1, "Testing name 1", 22},
+		{2, "Testing name 2", 42},
+	}
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/test-special-filter?age__neq=1",
+		nil,
+	)
+
+	Mock.ExpectQuery("SELECT .* FROM `test_models` WHERE `age` != (.+)").
+		WithArgs(2).
 		WillReturnRows(sqlmock.
 			NewRows([]string{"id", "name", "age"}).
 			AddRow(rows[0]...).
