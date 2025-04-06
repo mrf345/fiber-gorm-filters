@@ -73,7 +73,7 @@ func ListUsers(c *fiber.Ctx) error {
     var filter = fgf.FilterScope{Ctx: c, Fields: []string{"age", "name"}}
 
     // Apply filtering scope
-    if err := DB.Scopes(filter.Scope()).Find(&users).Error; err != nil {
+    if err := DB.Model(&User{}).Scopes(filter.Scope()).Find(&users).Error; err != nil {
         log.Println(err)
         _ = c.SendStatus(fiber.StatusInternalServerError)
         return err
@@ -97,9 +97,7 @@ func ListUsers(c *fiber.Ctx) error {
     var page = fgf.PageScope{Ctx: c}
 
     // Get and set total count of users
-    if err = database.I.DB.
-        Model(&User{}).
-        Count(&page.Total).Error; err != nil {
+    if err = DB.Model(&User{}).Count(&page.Total).Error; err != nil {
         return c.Status(fiber.StatusInternalServerError).JSON(
             fiber.Map{
                 "message": err.Error(),
