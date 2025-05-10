@@ -15,7 +15,7 @@ import (
 
 func TestPageScope(t *testing.T) {
 	assert := assert.New(t)
-	total := 50
+	total := 35
 	rows := [][]driver.Value{}
 	req := httptest.NewRequest(
 		http.MethodGet,
@@ -49,7 +49,7 @@ func TestPageScope(t *testing.T) {
 
 func TestRequestPageScope(t *testing.T) {
 	assert := assert.New(t)
-	total := 50
+	total := 35
 	rows := [][]driver.Value{}
 	page := 3
 	req := httptest.NewRequest(

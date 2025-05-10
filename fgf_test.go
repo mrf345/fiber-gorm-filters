@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/gofiber/fiber/v2"
@@ -32,6 +33,7 @@ type TestModel struct {
 	Age        uint
 	Occupation string
 	Active     bool
+	Created    time.Time
 }
 
 func GetRespParsedBody[T any](resp *http.Response) (respData T) {
@@ -96,7 +98,11 @@ func setupRoutes(app *fiber.App) {
 
 	app.Get("/test-filter", func(c *fiber.Ctx) error {
 		var items []TestModel
-		var filter = fgf.FilterScope{Ctx: c, Fields: []string{"age", "name", "active"}}
+		var filter = fgf.FilterScope{
+			Ctx:       c,
+			Fields:    []string{"age", "name", "active", "created"},
+			ForceDate: true,
+		}
 
 		if err := DB.
 			Model(&TestModel{}).
@@ -133,7 +139,7 @@ func setupRoutes(app *fiber.App) {
 
 	app.Get("/test-page", func(c *fiber.Ctx) error {
 		var items []TestModel
-		var page = fgf.PageScope{Ctx: c, Total: 50}
+		var page = fgf.PageScope{Ctx: c, Total: 35}
 
 		if err := DB.Scopes(page.Scope()).Find(&items).Error; err != nil {
 			log.Println(err)
