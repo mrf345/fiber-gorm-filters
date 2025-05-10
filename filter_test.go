@@ -121,3 +121,45 @@ func TestRequestFilterScopeSpecialFilter(t *testing.T) {
 	assert.Nil(err)
 	assert.Equal(fiber.StatusOK, resp.StatusCode)
 }
+
+func TestRequestFilterScopeIsNullFilter(t *testing.T) {
+	assert := assert.New(t)
+	rows := [][]driver.Value{{1, 22, true}}
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/test-filter?active__isnull=true",
+		nil,
+	)
+
+	Mock.ExpectQuery("SELECT .* FROM `test_models` WHERE `active` IS NULL").
+		WillReturnRows(sqlmock.
+			NewRows([]string{"id", "age", "active"}).
+			AddRow(rows[0]...),
+		)
+
+	resp, err := App.Test(req, TestTimeoutMS)
+
+	assert.Nil(err)
+	assert.Equal(fiber.StatusOK, resp.StatusCode)
+}
+
+func TestRequestFilterScopeNotNullFilter(t *testing.T) {
+	assert := assert.New(t)
+	rows := [][]driver.Value{{1, 22, true}}
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/test-filter?active__isnull=false",
+		nil,
+	)
+
+	Mock.ExpectQuery("SELECT .* FROM `test_models` WHERE `active` IS NOT NULL").
+		WillReturnRows(sqlmock.
+			NewRows([]string{"id", "age", "active"}).
+			AddRow(rows[0]...),
+		)
+
+	resp, err := App.Test(req, TestTimeoutMS)
+
+	assert.Nil(err)
+	assert.Equal(fiber.StatusOK, resp.StatusCode)
+}
