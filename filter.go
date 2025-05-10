@@ -3,6 +3,7 @@ package fgf
 import (
 	"fmt"
 	"log"
+	"net/url"
 	"reflect"
 	"slices"
 	"strconv"
@@ -43,7 +44,8 @@ const (
 	// if field value in comma separated list of values  (i.e. ?name__in=John,Oliver)
 	In Filter = "in"
 	// if field value not in comma separated list of values  (i.e. ?name__not_in=John,Oliver)
-	NotIn Filter = "not_in"
+	NotIn  Filter = "not_in"
+	IsNull Filter = "isnull"
 )
 
 // converts filter to string type
@@ -106,6 +108,13 @@ var filterQueryMapper = filterQueryMap{
 
 		return fmt.Sprintf("`%s` NOT IN (?)", field), value
 	},
+	IsNull: func(field string, value any) (string, any) {
+		if value == true || value == "true" || value == "1" {
+			return fmt.Sprintf("`%s` IS NULL", field), nil
+		}
+
+		return fmt.Sprintf("`%s` IS NOT NULL", field), nil
+	},
 }
 
 // scope that enables filtering the results by [FilterScope.Fields] if a [Filter] is present in the request.
@@ -117,6 +126,10 @@ type FilterScope struct {
 	Fields []string
 	// map of filter special handlers keyed with <field>__<filter> (i.e. name__contains, age__gt)
 	Special SFilters
+	// convert all datetime fields with date function
+	ForceDate bool
+	// optional uri to parse the query string from instead of [FilterScope.Ctx]
+	FromUri string
 
 	db            *gorm.DB
 	specialValues map[string]any
@@ -153,12 +166,18 @@ func (f *FilterScope) Scope() GScope {
 
 func (f *FilterScope) getQueriesAndValues() (queries []string, values []any) {
 	var model reflect.Value
+	var params map[string]string
+	var err error
 
 	if f.db.Statement.Model != nil {
 		model = reflect.Indirect(reflect.ValueOf(f.db.Statement.Model))
 	}
 
-	for q, v := range f.Ctx.Queries() {
+	if params, err = f.getQueryParams(); err != nil {
+		log.Println("FilterScope: failed to parse query params:", err.Error())
+	}
+
+	for q, v := range params {
 		var (
 			query string
 			value any
@@ -200,8 +219,15 @@ func (f *FilterScope) getQueriesAndValues() (queries []string, values []any) {
 			continue
 		}
 
+		if f.ForceDate {
+			query = f.convertField(model, chunks[0], query)
+		}
+
 		queries = append(queries, query)
-		values = append(values, value)
+
+		if value != nil {
+			values = append(values, value)
+		}
 	}
 
 	return
@@ -230,4 +256,53 @@ func (f *FilterScope) convertValue(model reflect.Value, field, value string) (o 
 	}
 
 	return
+}
+
+func (f *FilterScope) convertField(model reflect.Value, field, query string) string {
+	if !model.IsValid() {
+		return query
+	}
+
+	modelField := strcase.UpperCamelCase(field)
+	value := model.FieldByName(modelField)
+	kind := value.Kind()
+
+	if kind == reflect.Struct &&
+		value.Type().String() == "time.Time" {
+		return strings.ReplaceAll(
+			query,
+			fmt.Sprintf("`%s`", field),
+			fmt.Sprintf("DATE(`%s`)", field),
+		)
+	}
+
+	return query
+}
+
+func (f *FilterScope) getQueryParams() (map[string]string, error) {
+	if len(f.FromUri) > 0 {
+		var uri *url.URL
+		var err error
+		var vs url.Values
+
+		if uri, err = url.ParseRequestURI(f.FromUri); err != nil {
+			return nil, err
+		}
+
+		if vs, err = url.ParseQuery(uri.RawQuery); err != nil {
+			return nil, err
+		}
+
+		params := make(map[string]string, len(vs))
+
+		for k, v := range vs {
+			if len(v) > 0 {
+				params[k] = v[len(v)-1]
+			}
+		}
+
+		return params, nil
+	}
+
+	return f.Ctx.Queries(), nil
 }
