@@ -1,6 +1,7 @@
 package fgf
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 
@@ -17,6 +18,8 @@ type SortScope struct {
 	Fields []string
 	// default fields to sort by if [SortParam] is not present in the request (i.e. id, -updated_at)
 	Default []string
+	// optional table alias to use in the query (i.e. users)
+	Alias string
 }
 
 // generates the GORM scope for sorting
@@ -53,10 +56,17 @@ func (s SortScope) Scope() GScope {
 
 			query = query.Order(clause.OrderByColumn{
 				Desc:   desc,
-				Column: clause.Column{Name: field},
+				Column: clause.Column{Name: s.mapField(field)},
 			})
 		}
 
 		return query
 	}
+}
+
+func (s SortScope) mapField(field string) string {
+	if len(s.Alias) > 0 {
+		field = fmt.Sprintf("%s.%s", s.Alias, field)
+	}
+	return field
 }
