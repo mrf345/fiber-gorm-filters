@@ -130,6 +130,8 @@ type FilterScope struct {
 	ForceDate bool
 	// optional uri to parse the query string from instead of [FilterScope.Ctx]
 	FromUri string
+	// optional table alias to use in the query (i.e. users)
+	Alias string
 
 	db            *gorm.DB
 	specialValues map[string]any
@@ -196,6 +198,7 @@ func (f *FilterScope) getQueriesAndValues() (queries []string, values []any) {
 			}
 
 			query, value, _ = Equals.Map(q, value)
+			query = f.mapQuery(query)
 			queries = append(queries, query)
 			values = append(values, value)
 			continue
@@ -219,6 +222,8 @@ func (f *FilterScope) getQueriesAndValues() (queries []string, values []any) {
 			continue
 		}
 
+		query = f.mapQuery(query)
+
 		if f.ForceDate {
 			query = f.convertField(model, chunks[0], query)
 		}
@@ -231,6 +236,13 @@ func (f *FilterScope) getQueriesAndValues() (queries []string, values []any) {
 	}
 
 	return
+}
+
+func (f *FilterScope) mapQuery(query string) string {
+	if len(f.Alias) > 0 {
+		query = fmt.Sprintf("`%s`.%s", f.Alias, query)
+	}
+	return query
 }
 
 func (f *FilterScope) convertValue(model reflect.Value, field, value string) (o any, err error) {
