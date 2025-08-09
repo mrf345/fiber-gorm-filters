@@ -250,14 +250,19 @@ func (f *FilterScope) convertValue(model reflect.Value, field, value string) (o 
 		return value, nil
 	}
 
-	modelField := strcase.UpperCamelCase(field)
-	kind := model.FieldByName(modelField).Kind()
+	var modelField string
 
-	switch kind {
+	if strings.ToLower(field) == "id" {
+		modelField = "ID"
+	} else {
+		modelField = strcase.UpperCamelCase(field)
+	}
+
+	switch model.FieldByName(modelField).Kind() {
 	case reflect.Bool:
 		o, err = strconv.ParseBool(value)
 	case reflect.Invalid:
-		log.Println("FilterScope: field not found:", modelField)
+		log.Println("FilterScope: field not found ", modelField)
 		o = value
 	default:
 		o = value
