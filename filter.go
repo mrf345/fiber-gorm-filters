@@ -252,8 +252,10 @@ func (f *FilterScope) convertValue(model reflect.Value, field, value string) (o 
 
 	var modelField string
 
-	if strings.ToLower(field) == "id" {
+	if field == "id" {
 		modelField = "ID"
+	} else if strings.HasSuffix(field, "_id") {
+		modelField = strcase.UpperCamelCase(field)[:len(field)-3] + "ID"
 	} else {
 		modelField = strcase.UpperCamelCase(field)
 	}
