@@ -15,6 +15,10 @@ type PageScope struct {
 	Ctx *fiber.Ctx
 	// the expected total number of results
 	Total int64
+	// scope specific number of items to return per page (overrides [PageSize])
+	PageSize int
+	// scope specific maximum number of items that can be returned per page (overrides [MaxPageSize])
+	MaxPageSize int
 
 	current  int
 	previous int
@@ -52,7 +56,7 @@ func (p *PageScope) Scope() GScope {
 	}
 
 	p.current = p.Ctx.QueryInt(PageParam, 0)
-	pageSize := p.Ctx.QueryInt(PageSizeParam, PageSize)
+	pageSize := p.Ctx.QueryInt(PageSizeParam, p.DefaultPageSize())
 	maxPage := int(math.Ceil(float64(p.Total) / float64(pageSize)))
 
 	if p.current <= 0 {
@@ -69,8 +73,8 @@ func (p *PageScope) Scope() GScope {
 		p.previous = p.current - 1
 	}
 
-	if pageSize > MaxPageSize {
-		pageSize = MaxPageSize
+	if pageSize > p.DefaultMaxPageSize() {
+		pageSize = p.DefaultMaxPageSize()
 	} else if pageSize <= 0 {
 		pageSize = PageSize
 	}
@@ -80,7 +84,25 @@ func (p *PageScope) Scope() GScope {
 	}
 }
 
-// return populated response body, pulled into a separate method for ease of overriding
+// returns default page size to fallback to
+func (p *PageScope) DefaultPageSize() int {
+	if p.PageSize != 0 {
+		return p.PageSize
+	}
+
+	return PageSize
+}
+
+// returns default maximum page size to fallback to
+func (p *PageScope) DefaultMaxPageSize() int {
+	if p.MaxPageSize != 0 {
+		return p.MaxPageSize
+	}
+
+	return MaxPageSize
+}
+
+// returns populated response body, pulled into a separate method for ease of overriding
 func (p *PageScope) RespBody(results any) any {
 	return PaginatedResponse[any]{
 		Results: results,
