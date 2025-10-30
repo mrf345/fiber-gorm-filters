@@ -200,7 +200,7 @@ func (f *FilterScope) getQueriesAndValues() (queries []string, values []any) {
 			}
 
 			query, value, _ = Equals.Map(q, value)
-			query = f.mapQuery(query)
+			query = f.mapQuery(query, q)
 			queries = append(queries, query)
 			values = append(values, value)
 			continue
@@ -224,7 +224,7 @@ func (f *FilterScope) getQueriesAndValues() (queries []string, values []any) {
 			continue
 		}
 
-		query = f.mapQuery(query)
+		query = f.mapQuery(query, chunks[0])
 
 		if f.ForceDate {
 			query = f.convertField(model, chunks[0], query)
@@ -240,11 +240,11 @@ func (f *FilterScope) getQueriesAndValues() (queries []string, values []any) {
 	return
 }
 
-func (f *FilterScope) mapQuery(q string) string {
-	if f.Alias != "" && !slices.Contains(f.AliasExcluded, q) {
-		q = fmt.Sprintf("`%s`.%s", f.Alias, q)
+func (f *FilterScope) mapQuery(query, field string) string {
+	if f.Alias != "" && !slices.Contains(f.AliasExcluded, field) {
+		query = fmt.Sprintf("`%s`.%s", f.Alias, query)
 	}
-	return q
+	return query
 }
 
 func (f *FilterScope) convertValue(model reflect.Value, field, value string) (o any, err error) {
