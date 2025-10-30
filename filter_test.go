@@ -33,7 +33,8 @@ func TestRequestFilterScope(t *testing.T) {
 		"/test-filter?name__contains=2&age=22",
 		nil,
 	)
-	m := AnyArgIn{V: []driver.Value{"%2%", "22"}}
+
+	m := AnyArgIn{V: []driver.Value{"%2%", int64(22)}}
 
 	Mock.ExpectQuery("SELECT (.+) FROM `test_models` WHERE").
 		WithArgs(m, m).
