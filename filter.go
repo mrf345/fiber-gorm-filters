@@ -265,6 +265,12 @@ func (f *FilterScope) convertValue(model reflect.Value, field, value string) (o 
 	switch model.FieldByName(modelField).Kind() {
 	case reflect.Bool:
 		o, err = strconv.ParseBool(value)
+	case reflect.Int:
+		o, err = strconv.ParseInt(value, 10, 64)
+	case reflect.Uint:
+		o, err = strconv.ParseUint(value, 10, 64)
+	case reflect.Float64:
+		o, err = strconv.ParseFloat(value, 64)
 	case reflect.Invalid:
 		log.Println("FilterScope: field not found ", modelField)
 		o = value
