@@ -20,6 +20,8 @@ type SortScope struct {
 	Default []string
 	// optional table alias to use in the query (i.e. users)
 	Alias string
+	// optional fields to excluded from aliasing [SortScope.Alias]
+	AliasExcluded []string
 }
 
 // generates the GORM scope for sorting
@@ -64,9 +66,9 @@ func (s SortScope) Scope() GScope {
 	}
 }
 
-func (s SortScope) mapField(field string) string {
-	if len(s.Alias) > 0 {
-		field = fmt.Sprintf("%s.%s", s.Alias, field)
+func (s SortScope) mapField(f string) string {
+	if s.Alias != "" && !slices.Contains(s.AliasExcluded, f) {
+		f = fmt.Sprintf("%s.%s", s.Alias, f)
 	}
-	return field
+	return f
 }

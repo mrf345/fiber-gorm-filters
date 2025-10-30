@@ -132,6 +132,8 @@ type FilterScope struct {
 	FromUri string
 	// optional table alias to use in the query (i.e. users)
 	Alias string
+	// optional fields to excluded from aliasing [FilterScope.Alias]
+	AliasExcluded []string
 
 	db            *gorm.DB
 	specialValues map[string]any
@@ -238,11 +240,11 @@ func (f *FilterScope) getQueriesAndValues() (queries []string, values []any) {
 	return
 }
 
-func (f *FilterScope) mapQuery(query string) string {
-	if len(f.Alias) > 0 {
-		query = fmt.Sprintf("`%s`.%s", f.Alias, query)
+func (f *FilterScope) mapQuery(q string) string {
+	if f.Alias != "" && !slices.Contains(f.AliasExcluded, q) {
+		q = fmt.Sprintf("`%s`.%s", f.Alias, q)
 	}
-	return query
+	return q
 }
 
 func (f *FilterScope) convertValue(model reflect.Value, field, value string) (o any, err error) {
