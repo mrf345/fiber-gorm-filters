@@ -296,11 +296,19 @@ func (f *FilterScope) convertField(model reflect.Value, field, query string) str
 
 	if kind == reflect.Struct &&
 		value.Type().String() == "time.Time" {
-		return strings.ReplaceAll(
-			query,
-			fmt.Sprintf("`%s`", field),
-			fmt.Sprintf("DATE(`%s`)", field),
-		)
+		if f.Alias == "" {
+			return strings.ReplaceAll(
+				query,
+				fmt.Sprintf("`%s` ", field),
+				fmt.Sprintf("DATE(`%s`) ", field),
+			)
+		} else {
+			return strings.ReplaceAll(
+				query,
+				fmt.Sprintf("`%s`.`%s` ", f.Alias, field),
+				fmt.Sprintf("DATE(`%s`.`%s`) ", f.Alias, field),
+			)
+		}
 	}
 
 	return query
