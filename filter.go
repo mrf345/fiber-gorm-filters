@@ -265,9 +265,9 @@ func (f *FilterScope) convertValue(model reflect.Value, field, value string) (o 
 	switch model.FieldByName(modelField).Kind() {
 	case reflect.Bool:
 		o, err = strconv.ParseBool(value)
-	case reflect.Int:
+	case reflect.Int, reflect.Int64:
 		o, err = strconv.ParseInt(value, 10, 64)
-	case reflect.Uint:
+	case reflect.Uint, reflect.Uint64:
 		o, err = strconv.ParseUint(value, 10, 64)
 	case reflect.Float64:
 		o, err = strconv.ParseFloat(value, 64)
