@@ -265,9 +265,9 @@ func (f *FilterScope) convertValue(model reflect.Value, field, value string) (o 
 	switch model.FieldByName(modelField).Kind() {
 	case reflect.Bool:
 		o, err = strconv.ParseBool(value)
-	case reflect.Int:
+	case reflect.Int, reflect.Int64:
 		o, err = strconv.ParseInt(value, 10, 64)
-	case reflect.Uint:
+	case reflect.Uint, reflect.Uint64:
 		o, err = strconv.ParseUint(value, 10, 64)
 	case reflect.Float64:
 		o, err = strconv.ParseFloat(value, 64)
@@ -296,11 +296,19 @@ func (f *FilterScope) convertField(model reflect.Value, field, query string) str
 
 	if kind == reflect.Struct &&
 		value.Type().String() == "time.Time" {
-		return strings.ReplaceAll(
-			query,
-			fmt.Sprintf("`%s`", field),
-			fmt.Sprintf("DATE(`%s`)", field),
-		)
+		if f.Alias == "" {
+			return strings.ReplaceAll(
+				query,
+				fmt.Sprintf("`%s` ", field),
+				fmt.Sprintf("DATE(`%s`) ", field),
+			)
+		} else {
+			return strings.ReplaceAll(
+				query,
+				fmt.Sprintf("`%s`.`%s` ", f.Alias, field),
+				fmt.Sprintf("DATE(`%s`.`%s`) ", f.Alias, field),
+			)
+		}
 	}
 
 	return query
