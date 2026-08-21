@@ -19,10 +19,10 @@ type PageScope struct {
 	PageSize int
 	// scope specific maximum number of items that can be returned per page (overrides [MaxPageSize])
 	MaxPageSize int
+	// optimization flag if enabled will set page numbers post scope execution
+	SingleQuery bool
 
-	current  int
-	previous int
-	next     int
+	current, previous, next, pageSize int
 }
 
 // default paginated response format
@@ -49,6 +49,29 @@ func (p *PageScope) Next() int {
 	return p.next
 }
 
+// sets the current, previous and next page numbers
+func (p *PageScope) SetPages() {
+	max := p.maxPage()
+
+	if max == 0 || p.current <= 0 {
+		p.current = 1
+	} else if p.current > max {
+		p.current = max
+	}
+
+	if p.current > 1 {
+		p.previous = p.current - 1
+	}
+
+	if max > p.current {
+		p.next = p.current + 1
+	}
+}
+
+func (p *PageScope) maxPage() int {
+	return int(math.Ceil(float64(p.Total) / float64(p.pageSize)))
+}
+
 // generates the GORM scope for pagination
 func (p *PageScope) Scope() GScope {
 	if p.Ctx == nil {
@@ -56,31 +79,20 @@ func (p *PageScope) Scope() GScope {
 	}
 
 	p.current = p.Ctx.QueryInt(PageParam, 0)
-	pageSize := p.Ctx.QueryInt(PageSizeParam, p.DefaultPageSize())
-	maxPage := int(math.Ceil(float64(p.Total) / float64(pageSize)))
+	p.pageSize = p.Ctx.QueryInt(PageSizeParam, p.DefaultPageSize())
 
-	if p.current <= 0 {
-		p.current = 1
-	} else if p.current > maxPage {
-		p.current = maxPage
+	if !p.SingleQuery {
+		p.SetPages()
 	}
 
-	if maxPage > p.current {
-		p.next = p.current + 1
-	}
-
-	if p.current > 1 {
-		p.previous = p.current - 1
-	}
-
-	if pageSize > p.DefaultMaxPageSize() {
-		pageSize = p.DefaultMaxPageSize()
-	} else if pageSize <= 0 {
-		pageSize = PageSize
+	if p.pageSize > p.DefaultMaxPageSize() {
+		p.pageSize = p.DefaultMaxPageSize()
+	} else if p.pageSize <= 0 {
+		p.pageSize = PageSize
 	}
 
 	return func(db *gorm.DB) *gorm.DB {
-		return db.Offset((int(p.current) - 1) * pageSize).Limit(pageSize)
+		return db.Offset((int(p.current) - 1) * p.pageSize).Limit(p.pageSize)
 	}
 }
 
@@ -104,6 +116,10 @@ func (p *PageScope) DefaultMaxPageSize() int {
 
 // returns populated response body, pulled into a separate method for ease of overriding
 func (p *PageScope) RespBody(results any) any {
+	if p.SingleQuery {
+		p.SetPages()
+	}
+
 	return PaginatedResponse[any]{
 		Results: results,
 		Page:    p.Current(),
